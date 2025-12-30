@@ -1,4 +1,4 @@
-# 📦 FritzShark 1.1 Installer
+# 📦 FritzShark 1.1
 #### (c) Paci, 2025
 
 > Lightweight, automated traffic capture tool for AVM Fritz!Box devices.
@@ -55,7 +55,7 @@ fritzshark [runtime] [iface]
 
 - `runtime` = capture time in seconds (default: `300`)  
 - `iface` = interface ID (default: `1-lan`)  
-  → The full interface list can be found using `fritzbox-capture`.
+  → The full interface list can be found in https://github.com/jpluimers/fritzcap/blob/master/fritzcap-interfaces-table.md.
 
 ---
 
