@@ -1,0 +1,6 @@
+config.env
+*.pcapng
+*.zip
+*.log
+Captured/
+

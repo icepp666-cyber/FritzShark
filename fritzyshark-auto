@@ -1,0 +1,83 @@
+#!/bin/bash
+set -euo pipefail
+
+# ──────────────────────────────────────────────
+# 🆘 Handle --help
+# ──────────────────────────────────────────────
+if [[ "${1:-}" == "--help" ]]; then
+    echo "Usage: fritzshark [runtime] [iface]"
+    echo "  runtime - capture time in seconds (default: 300)"
+    echo "  iface   - interface ID (default: 1-lan)"
+    exit 0
+fi
+
+# ──────────────────────────────────────────────
+# 📄 Load configuration
+# ──────────────────────────────────────────────
+CONFIG_FILE="$HOME/.config/FritzShark/config.env"
+
+if [[ ! -f "$CONFIG_FILE" ]]; then
+    echo "✖ config.env not found! Please run install.sh first."
+    exit 1
+fi
+
+# Export vars (quote-safe)
+set -a
+source "$CONFIG_FILE"
+set +a
+
+# ──────────────────────────────────────────────
+# ⏱️ Runtime & SID
+# ──────────────────────────────────────────────
+runTime="${1:-300}"
+SID="$(python3 "$WORK_DIR/scripts/fritzysid.py")"
+
+# ──────────────────────────────────────────────
+# 📁 Output setup
+# ──────────────────────────────────────────────
+mkdir -p "$WORK_DIR/FritzShark/Captured"
+OUTFILE="$WORK_DIR/FritzShark/Captured/fritz_capture_$(date +%Y%m%d_%H%M%S).pcapng"
+
+FIFO_DIR="/tmp/fritzcap"
+FIFO="$FIFO_DIR/fifo_$$"
+mkdir -p "$FIFO_DIR"
+mkfifo "$FIFO"
+
+# ──────────────────────────────────────────────
+# ▶️ Start capture
+# ──────────────────────────────────────────────
+echo "🔄 Starting capture..."
+echo "📁 Output: $OUTFILE"
+
+timeout "$runTime" bash "$WORK_DIR/scripts/fritzbox-capture" \
+  --arg-ip "$FRITZBOX_IP" \
+  --arg-iface "${2:-1-lan}" \
+  --arg-sid "$SID" \
+  --fifo "$FIFO" \
+  --extcap-capture-filter "$CAPTURE_FILTER" \
+  &
+
+CAP_PID=$!
+
+# ──────────────────────────────────────────────
+# ⏳ Countdown timer
+# ──────────────────────────────────────────────
+for ((i=runTime; i>=0; i--)); do
+    echo -ne "\r⏳ Capturing... $i sec remaining "
+    sleep 1
+done &
+TIMER_PID=$!
+
+# ──────────────────────────────────────────────
+# 💾 Save from FIFO
+# ──────────────────────────────────────────────
+cat "$FIFO" > "$OUTFILE"
+
+# ──────────────────────────────────────────────
+# 🧹 Cleanup
+# ──────────────────────────────────────────────
+wait $CAP_PID
+kill $TIMER_PID 2>/dev/null
+rm -f "$FIFO"
+
+echo -e "\n✅ Capture complete: $(du -h "$OUTFILE" | cut -f1) saved"

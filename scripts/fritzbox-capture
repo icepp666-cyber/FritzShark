@@ -1,0 +1,92 @@
+#!/bin/bash
+#
+# FritzBox headless capture backend
+#
+# Based on original work by:
+#   Rob Wu <rob@robwu.nl>
+#   https://github.com/Rob--W/fritzbox-extcap-wireshark
+#
+# This version is heavily stripped down and refactored
+# for CLI-only, non-Wireshark usage.
+#
+# Maintained by: Paci, 2025
+#
+
+set -euo pipefail
+
+# ──────────────────────────────────────────────
+# Defaults
+# ──────────────────────────────────────────────
+FRITZ_BOX_IP=192.168.178.1
+FRITZ_BOX_IFACE=1-lan
+FRITZ_BOX_SID=
+FIFO_FILE=
+CAPTURE_FILTER=
+
+CURL_BIN=/usr/bin/curl
+TCPDUMP_BIN=/usr/bin/tcpdump
+
+# ──────────────────────────────────────────────
+# Argument parsing (only what we actually use)
+# ──────────────────────────────────────────────
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --arg-ip)        FRITZ_BOX_IP="$2"; shift ;;
+        --arg-iface)     FRITZ_BOX_IFACE="$2"; shift ;;
+        --arg-sid)       FRITZ_BOX_SID="$2"; shift ;;
+        --fifo)          FIFO_FILE="$2"; shift ;;
+        --extcap-capture-filter)
+                         CAPTURE_FILTER="$2"; shift ;;
+        --capture)       ;; # optional, ignored
+        *)               ;; # silently ignore unknown extcap junk
+    esac
+    shift
+done
+
+# ──────────────────────────────────────────────
+# Sanity checks
+# ──────────────────────────────────────────────
+if [[ -z "$FRITZ_BOX_SID" ]]; then
+    echo "Missing FritzBox SID" >&2
+    exit 1
+fi
+
+if [[ -z "$FIFO_FILE" || ! -e "$FIFO_FILE" ]]; then
+    echo "FIFO file missing or invalid" >&2
+    exit 1
+fi
+
+# Extract SID if pasted as URL
+if [[ "$FRITZ_BOX_SID" =~ sid=([a-f0-9]{16}) ]]; then
+    FRITZ_BOX_SID="${BASH_REMATCH[1]}"
+fi
+
+# ──────────────────────────────────────────────
+# Stop any existing capture
+# ──────────────────────────────────────────────
+"$CURL_BIN" --silent --insecure \
+  "https://${FRITZ_BOX_IP}/cgi-bin/capture_notimeout?sid=${FRITZ_BOX_SID}&capture=Stop&ifaceorminor=${FRITZ_BOX_IFACE}" \
+  >/dev/null || true
+
+# ──────────────────────────────────────────────
+# Start capture
+# ──────────────────────────────────────────────
+exec 3>"$FIFO_FILE"
+
+CAPTURE_URL="https://${FRITZ_BOX_IP}/cgi-bin/capture_notimeout?sid=${FRITZ_BOX_SID}&capture=Start&ifaceorminor=${FRITZ_BOX_IFACE}"
+
+if [[ -z "$CAPTURE_FILTER" ]]; then
+    "$CURL_BIN" --silent --insecure --no-buffer "$CAPTURE_URL" >&3
+else
+    "$CURL_BIN" --silent --insecure --no-buffer "$CAPTURE_URL" \
+        | "$TCPDUMP_BIN" -nNS -s0 -r- -w- -- "$CAPTURE_FILTER" >&3
+fi
+
+# ──────────────────────────────────────────────
+# Cleanup
+# ──────────────────────────────────────────────
+"$CURL_BIN" --silent --insecure \
+  "https://${FRITZ_BOX_IP}/cgi-bin/capture_notimeout?sid=${FRITZ_BOX_SID}&capture=Stop&ifaceorminor=${FRITZ_BOX_IFACE}" \
+  >/dev/null || true
+
+exec 3>&-
