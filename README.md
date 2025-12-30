@@ -1,4 +1,4 @@
-# 📦 FritzShark 1.1 Installer
+# 📦 FritzShark 1.1
 #### (c) Paci, 2025
 
 > Lightweight, automated traffic capture tool for AVM Fritz!Box devices.
