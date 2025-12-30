@@ -35,8 +35,8 @@ SID="$(python3 "$WORK_DIR/scripts/fritzysid.py")"
 # ──────────────────────────────────────────────
 # 📁 Output setup
 # ──────────────────────────────────────────────
-mkdir -p "$WORK_DIR/FritzShark/Captured"
-OUTFILE="$WORK_DIR/FritzShark/Captured/fritz_capture_$(date +%Y%m%d_%H%M%S).pcapng"
+mkdir -p "$WORK_DIR/Captured"
+OUTFILE="$WORK_DIR/Captured/fritz_capture_$(date +%Y%m%d_%H%M%S).pcapng"
 
 FIFO_DIR="/tmp/fritzcap"
 FIFO="$FIFO_DIR/fifo_$$"
