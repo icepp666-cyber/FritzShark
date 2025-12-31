@@ -3,4 +3,5 @@ config.env
 *.zip
 *.log
 Captured/
+Workdir
 
